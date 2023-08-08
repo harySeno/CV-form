@@ -51,3 +51,49 @@ func GetByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 }
+
+func AddProfile(req *restful.Request, res *restful.Response) {
+	addRequest := &models.Applicant{}
+
+	err := req.ReadEntity(addRequest)
+	if err != nil {
+		err := res.WriteErrorString(http.StatusBadRequest, "Invalid payload format")
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	applicant := models.Applicant{
+		ProfileCode:    addRequest.ProfileCode,
+		WantedJobTitle: addRequest.WantedJobTitle,
+		FirstName:      addRequest.FirstName,
+		LastName:       addRequest.LastName,
+		Email:          addRequest.Email,
+		Phone:          addRequest.Phone,
+		Country:        addRequest.Country,
+		City:           addRequest.City,
+		Address:        addRequest.Address,
+		PostalCode:     addRequest.PostalCode,
+		DrivingLicense: addRequest.DrivingLicense,
+		Nationality:    addRequest.Nationality,
+		PlaceOfBirth:   addRequest.PlaceOfBirth,
+		DateOfBirth:    addRequest.DateOfBirth,
+		PhotoUrl:       addRequest.PhotoUrl,
+	}
+
+	newProfileCode := len(candidate) + 1
+	applicant.ProfileCode = newProfileCode
+	candidate = append(candidate, applicant)
+
+	response := struct {
+		ProfileCode int `json:"profileCode"`
+	}{
+		ProfileCode: newProfileCode,
+	}
+	err = res.WriteHeaderAndEntity(http.StatusCreated, response)
+	if err != nil {
+		return
+	}
+
+}

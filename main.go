@@ -10,17 +10,21 @@ import (
 func main() {
 	// create new web service
 	webService := new(restful.WebService)
+	webService.Path("/api").
+		Consumes(restful.MIME_JSON).
+		Produces(restful.MIME_JSON)
 
 	// initiate mock data
 	restapi.InitializeMockData()
 
 	// create a new route
 	webService.
-		Path("/api").
-		Consumes(restful.MIME_JSON).
-		Produces(restful.MIME_JSON).
 		Route(webService.GET("/profile/{code}").
 			To(restapi.GetByCode))
+
+	webService.
+		Route(webService.POST("/profile").
+			To(restapi.AddProfile))
 
 	// create a new container
 	container := restful.NewContainer()
