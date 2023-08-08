@@ -65,7 +65,6 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 	}
 
 	applicant := models.Applicant{
-		ProfileCode:    addRequest.ProfileCode,
 		WantedJobTitle: addRequest.WantedJobTitle,
 		FirstName:      addRequest.FirstName,
 		LastName:       addRequest.LastName,
