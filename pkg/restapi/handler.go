@@ -8,8 +8,10 @@ import (
 	"strconv"
 )
 
+// candidate holds the mock data for applicants
 var candidate []models.Applicant
 
+// InitializeMockData initializes the mock data for testing
 func InitializeMockData() {
 	candidate = []models.Applicant{{
 		ProfileCode:    12345678,
@@ -31,6 +33,7 @@ func InitializeMockData() {
 	}
 }
 
+// GetByCode handles GET requests to retrieve an applicant by profile code
 func GetByCode(request *restful.Request, response *restful.Response) {
 	candidateCode := request.PathParameter("code")
 	code, err := strconv.Atoi(candidateCode)
@@ -47,12 +50,14 @@ func GetByCode(request *restful.Request, response *restful.Response) {
 			return
 		}
 	}
+
 	err = response.WriteError(http.StatusNotFound, err)
 	if err != nil {
 		return
 	}
 }
 
+// AddProfile handles POST requests to add a new applicant profile
 func AddProfile(req *restful.Request, res *restful.Response) {
 	addRequest := &models.Applicant{}
 
@@ -65,6 +70,7 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 		return
 	}
 
+	// Create a new applicant with data from the request
 	applicant := models.Applicant{
 		WantedJobTitle: addRequest.WantedJobTitle,
 		FirstName:      addRequest.FirstName,
@@ -82,22 +88,27 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 		PhotoUrl:       addRequest.PhotoUrl,
 	}
 
+	// Generate a new profile code and assign it
 	newProfileCode := len(candidate) + 1
 	applicant.ProfileCode = newProfileCode
+
+	// Append the new applicant to the candidate list
 	candidate = append(candidate, applicant)
 
+	// Create a response JSON with the new profile code
 	response := struct {
 		ProfileCode int `json:"profileCode"`
 	}{
 		ProfileCode: newProfileCode,
 	}
+
 	err = res.WriteHeaderAndEntity(http.StatusCreated, response)
 	if err != nil {
 		return
 	}
-
 }
 
+// UpdateProfile handles PUT requests to update an existing applicant profile by profile code
 func UpdateProfile(request *restful.Request, response *restful.Response) {
 	candidateCode := request.PathParameter("code")
 	code, err := strconv.Atoi(candidateCode)
@@ -106,6 +117,7 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		return
 	}
 
+	// Find the index of the profile with the given code
 	indexToUpdate := -1
 	for i, applicant := range candidate {
 		if applicant.ProfileCode == code {
@@ -122,6 +134,7 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		return
 	}
 
+	// Read the updated data from the request
 	updateRequest := &models.Applicant{}
 	err = request.ReadEntity(updateRequest)
 	if err != nil {
@@ -129,6 +142,7 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		return
 	}
 
+	// Update the profile data
 	candidate[indexToUpdate] = models.Applicant{
 		ProfileCode:    code,
 		WantedJobTitle: updateRequest.WantedJobTitle,

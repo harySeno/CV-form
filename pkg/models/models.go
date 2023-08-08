@@ -1,5 +1,6 @@
 package models
 
+// Applicant contains candidate data
 type Applicant struct {
 	ProfileCode    int    `json:"profileCode"`
 	WantedJobTitle string `json:"wantedJobTitle"`
