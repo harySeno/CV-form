@@ -2,6 +2,7 @@ package restapi
 
 import (
 	"CV-form/pkg/models"
+	"errors"
 	"github.com/emicklei/go-restful/v3"
 	"net/http"
 	"strconv"
@@ -95,4 +96,59 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 		return
 	}
 
+}
+
+func UpdateProfile(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	indexToUpdate := -1
+	for i, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			indexToUpdate = i
+			break
+		}
+	}
+
+	if indexToUpdate == -1 {
+		err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	updateRequest := &models.Applicant{}
+	err = request.ReadEntity(updateRequest)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	candidate[indexToUpdate] = models.Applicant{
+		ProfileCode:    code,
+		WantedJobTitle: updateRequest.WantedJobTitle,
+		FirstName:      updateRequest.FirstName,
+		LastName:       updateRequest.LastName,
+		Email:          updateRequest.Email,
+		Phone:          updateRequest.Phone,
+		Country:        updateRequest.Country,
+		City:           updateRequest.City,
+		Address:        updateRequest.Address,
+		PostalCode:     updateRequest.PostalCode,
+		DrivingLicense: updateRequest.DrivingLicense,
+		Nationality:    updateRequest.Nationality,
+		PlaceOfBirth:   updateRequest.PlaceOfBirth,
+		DateOfBirth:    updateRequest.DateOfBirth,
+		PhotoUrl:       updateRequest.PhotoUrl,
+	}
+
+	err = response.WriteHeaderAndEntity(http.StatusOK, candidate)
+	if err != nil {
+		return
+	}
 }

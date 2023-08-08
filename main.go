@@ -26,6 +26,10 @@ func main() {
 		Route(webService.POST("/profile").
 			To(restapi.AddProfile))
 
+	webService.
+		Route(webService.PUT("/profile/{code}").
+			To(restapi.UpdateProfile))
+
 	// create a new container
 	container := restful.NewContainer()
 	container.Add(webService)
