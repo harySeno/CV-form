@@ -58,6 +58,18 @@ func main() {
 		Route(webService.DELETE("/employment/{code}").
 			To(restapi.DeleteEmployment))
 
+	webService.
+		Route(webService.GET("/education/{code}").
+			To(restapi.GetEducationByCode))
+
+	webService.
+		Route(webService.POST("/education/{code}").
+			To(restapi.AddEducation))
+
+	webService.
+		Route(webService.DELETE("/education/{code}").
+			To(restapi.DeleteEducation))
+
 	// create a new container
 	container := restful.NewContainer()
 	container.Add(webService)
