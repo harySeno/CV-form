@@ -17,4 +17,9 @@ type Applicant struct {
 	PlaceOfBirth   string `json:"placeOfBirth"`
 	DateOfBirth    string `json:"dateOfBirth"`
 	PhotoUrl       string `json:"photoUrl"`
+	WorkExp
+}
+
+type WorkExp struct {
+	WorkingExperience string `json:"workingExperience"`
 }

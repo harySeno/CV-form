@@ -197,3 +197,47 @@ func GetExpByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 }
+
+// UpdateExperience handles PUT requests to update an existing applicant working experience by profile code
+func UpdateExperience(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	updateRequest := struct {
+		WorkingExperience string `json:"workingExperience"`
+	}{}
+
+	err = request.ReadEntity(&updateRequest)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the index of the profile with the given code
+	indexToUpdate := -1
+	for i, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			indexToUpdate = i
+			break
+		}
+	}
+
+	if indexToUpdate == -1 {
+		err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	candidate[indexToUpdate].WorkingExperience = updateRequest.WorkingExperience
+
+	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
+	if err != nil {
+		return
+	}
+}
