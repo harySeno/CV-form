@@ -6,7 +6,7 @@ type Applicant struct {
 	WorkExp
 	Employment []Employment `json:"employment"`
 	Education  []Education  `json:"education"`
-	Skill
+	Skill      []Skill      `json:"skill"`
 }
 
 type PersonalDetail struct {
@@ -111,10 +111,18 @@ var MockApplicantData = []Applicant{{
 		City:        "Jakarta",
 		Description: "UI",
 	}},
-	Skill: Skill{
+	Skill: []Skill{{
 		ID:    1,
 		Skill: "Docker",
 		Level: "Expert",
-	},
+	}, {
+		ID:    2,
+		Skill: "React JS",
+		Level: "Expert",
+	}, {
+		ID:    3,
+		Skill: "Golang",
+		Level: "Expert",
+	}},
 },
 }

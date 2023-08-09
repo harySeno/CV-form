@@ -577,3 +577,153 @@ func DeleteEducation(request *restful.Request, response *restful.Response) {
 		return
 	}
 }
+
+// GetSkillByCode handles GET requests to retrieve an applicant skill by profile code
+func GetSkillByCode(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	for _, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			result := struct {
+				Skill []models.Skill `json:"skill"`
+			}{
+				Skill: applicant.Skill,
+			}
+			err := response.WriteEntity(result)
+			if err != nil {
+				return
+			}
+			return
+		}
+	}
+
+	err = response.WriteError(http.StatusNotFound, err)
+	if err != nil {
+		return
+	}
+}
+
+// AddSkill handles POST requests to add an applicant skill by profile code
+func AddSkill(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	skill := models.Skill{}
+	err = request.ReadEntity(&skill)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the applicant with the given code
+	var targetApplicant *models.Applicant
+	for i := range candidate {
+		if candidate[i].ProfileCode == code {
+			targetApplicant = &candidate[i]
+			break
+		}
+	}
+
+	if targetApplicant == nil {
+		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Generate a new ID for the new education
+	newID := len(targetApplicant.Skill) + 1
+	skill.ID = newID
+
+	// Append the new education to the applicant's education list
+	targetApplicant.Skill = append(targetApplicant.Skill, skill)
+
+	result := struct {
+		ProfileCode int `json:"profileCode"`
+		ID          int `json:"id"`
+	}{
+		ProfileCode: code,
+		ID:          newID,
+	}
+
+	err = response.WriteHeaderAndEntity(http.StatusCreated, result)
+	if err != nil {
+		return
+	}
+}
+
+// DeleteSkill handles DELETE requests to remove an applicant skill by profile code
+func DeleteSkill(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Parse the 'id' query parameter
+	skillID := request.QueryParameter("id")
+	id, err := strconv.Atoi(skillID)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the applicant with the given code
+	var targetApplicant *models.Applicant
+	for i := range candidate {
+		if candidate[i].ProfileCode == code {
+			targetApplicant = &candidate[i]
+			break
+		}
+	}
+
+	if targetApplicant == nil {
+		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Find the index of the skill with the specified 'id'
+	indexToRemove := -1
+	for i := range targetApplicant.Skill {
+		if targetApplicant.Skill[i].ID == id {
+			indexToRemove = i
+			break
+		}
+	}
+
+	if indexToRemove == -1 {
+		err = response.WriteError(http.StatusNotFound, errors.New("skill not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Remove the skill from the applicant's skill slice
+	targetApplicant.Skill = append(targetApplicant.Skill[:indexToRemove], targetApplicant.Skill[indexToRemove+1:]...)
+
+	result := struct {
+		ProfileCode int `json:"profileCode"`
+	}{
+		ProfileCode: code,
+	}
+
+	err = response.WriteEntity(result)
+	if err != nil {
+		return
+	}
+}
