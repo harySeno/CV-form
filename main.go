@@ -30,6 +30,10 @@ func main() {
 		Route(webService.PUT("/profile/{code}").
 			To(restapi.UpdateProfile))
 
+	webService.
+		Route(webService.GET("/working-experience/{code}").
+			To(restapi.GetExpByCode))
+
 	// create a new container
 	container := restful.NewContainer()
 	container.Add(webService)

@@ -166,3 +166,34 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		return
 	}
 }
+
+// GetExpByCode handles GET requests to retrieve an applicant working experience by profile code
+func GetExpByCode(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	for _, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			// Create a response JSON with the new workingExperience
+			workingExperience := "Software Engineer with bla bla bla experience."
+			resp := struct {
+				WorkingExperience string `json:"workingExperience"`
+			}{
+				WorkingExperience: workingExperience,
+			}
+			err := response.WriteEntity(resp)
+			if err != nil {
+				return
+			}
+			return
+		}
+	}
+
+	err = response.WriteError(http.StatusNotFound, err)
+	if err != nil {
+		return
+	}
+}
