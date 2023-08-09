@@ -182,7 +182,7 @@ func UploadPhoto(request *restful.Request, response *restful.Response) {
 	}
 
 	filename := fmt.Sprintf("%d.png", candidate[indexToUpdate].ProfileCode)
-	imagePath := "/app/upload/photo/"
+	imagePath := "/home/seno/Desktop"
 
 	// Write the image data to the file
 	err = ioutil.WriteFile(imagePath+filename, imageFile, 0644)
