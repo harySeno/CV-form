@@ -130,8 +130,12 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		ProfileCode:    code,
 		PersonalDetail: updateRequest.PersonalDetail,
 	}
-
-	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
+	result := struct {
+		ProfileCode int `json:"profileCode"`
+	}{
+		ProfileCode: code,
+	}
+	err = response.WriteHeaderAndEntity(http.StatusOK, result)
 	if err != nil {
 		return
 	}
