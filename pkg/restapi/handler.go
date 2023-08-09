@@ -2,10 +2,14 @@ package restapi
 
 import (
 	"CV-form/pkg/models"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/emicklei/go-restful/v3"
+	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 var candidate []models.Applicant
@@ -126,6 +130,69 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		PersonalDetail: updateRequest.PersonalDetail,
 	}
 
+	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
+	if err != nil {
+		return
+	}
+}
+
+// UploadPhoto handles PUT requests to upload applicant's photo
+func UploadPhoto(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the index of the profile with the given code
+	indexToUpdate := -1
+	for i, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			indexToUpdate = i
+			break
+		}
+	}
+
+	if indexToUpdate == -1 {
+		err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Read the updated data from the request
+	updateRequest := struct {
+		Image string `json:"base64img"`
+	}{}
+
+	err = request.ReadEntity(&updateRequest)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Save the base64 image to a file
+	b64data := updateRequest.Image[strings.IndexByte(updateRequest.Image, ',')+1:]
+	imageFile, err := base64.StdEncoding.DecodeString(b64data)
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	filename := fmt.Sprintf("%d.png", candidate[indexToUpdate].ProfileCode)
+	imagePath := "/app/upload/photo/"
+
+	// Write the image data to the file
+	err = ioutil.WriteFile(imagePath+filename, imageFile, 0644)
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// Update the PhotoUrl field with the new path
+	candidate[indexToUpdate].PhotoUrl = imagePath + filename
 	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
 	if err != nil {
 		return

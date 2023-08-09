@@ -35,6 +35,10 @@ func main() {
 			To(restapi.UpdateProfile))
 
 	webService.
+		Route(webService.PUT("/photo/{code}").
+			To(restapi.UploadPhoto))
+
+	webService.
 		Route(webService.GET("/working-experience/{code}").
 			To(restapi.GetExpByCode))
 
