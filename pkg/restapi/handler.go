@@ -210,3 +210,33 @@ func UpdateExperience(request *restful.Request, response *restful.Response) {
 		return
 	}
 }
+
+// GetEmploymentByCode handles GET requests to retrieve an applicant employment by profile code
+func GetEmploymentByCode(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	for _, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			resp := struct {
+				Employment []models.Employment `json:"employment"`
+			}{
+				Employment: applicant.Employment,
+			}
+			err := response.WriteEntity(resp)
+			if err != nil {
+				return
+			}
+			return
+		}
+	}
+
+	err = response.WriteError(http.StatusNotFound, err)
+	if err != nil {
+		return
+	}
+}

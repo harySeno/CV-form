@@ -4,7 +4,7 @@ type Applicant struct {
 	ProfileCode int `json:"profileCode"`
 	PersonalDetail
 	WorkExp
-	PastJob
+	Employment []Employment `json:"employment"`
 	Education
 	Skill
 }
@@ -30,7 +30,7 @@ type WorkExp struct {
 	WorkingExperience string `json:"workingExperience"`
 }
 
-type PastJob struct {
+type Employment struct {
 	ID          int    `json:"id"`
 	JobTitle    string `json:"jobTitle"`
 	Employer    string `json:"employer"`
@@ -77,7 +77,7 @@ var MockApplicantData = []Applicant{{
 	WorkExp: WorkExp{
 		WorkingExperience: "software engineer bla bla bla",
 	},
-	PastJob: PastJob{
+	Employment: []Employment{{
 		ID:          1,
 		JobTitle:    "CEO",
 		Employer:    "Toko Lapak",
@@ -85,7 +85,15 @@ var MockApplicantData = []Applicant{{
 		EndDate:     "01-01-2021",
 		City:        "Jakarta",
 		Description: "CEO",
-	},
+	}, {
+		ID:          2,
+		JobTitle:    "UI/UX Designer",
+		Employer:    "Pemprov DKI",
+		StartDate:   "01-01-2021",
+		EndDate:     "01-01-2022",
+		City:        "Jakarta",
+		Description: "Designer",
+	}},
 	Education: Education{
 		ID:          1,
 		School:      "ITB",
