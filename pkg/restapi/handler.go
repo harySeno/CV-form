@@ -8,28 +8,17 @@ import (
 	"strconv"
 )
 
-// candidate holds the mock data for applicants
 var candidate []models.Applicant
 
 // InitializeMockData initializes the mock data for testing
 func InitializeMockData() {
-	candidate = []models.Applicant{{
-		ProfileCode:    12345678,
-		WantedJobTitle: "Software Engineer",
-		FirstName:      "Namaku",
-		LastName:       "Ukaman",
-		Email:          "ukaman.namaku@gmail.com",
-		Phone:          "08008880000",
-		Country:        "Indonesia",
-		City:           "Jakarta",
-		Address:        "Jl. Gatot Subroto",
-		PostalCode:     200001,
-		DrivingLicense: "1234567890123456",
-		Nationality:    "Indonesia",
-		PlaceOfBirth:   "Maluku",
-		DateOfBirth:    "07-12-1988",
-		PhotoUrl:       "/app/upload/photo/12345678.png",
-	},
+	candidate = models.MockApplicantData
+}
+
+func GetAllData(_ *restful.Request, res *restful.Response) {
+	err := res.WriteEntity(candidate)
+	if err != nil {
+		return
 	}
 }
 
@@ -41,9 +30,17 @@ func GetByCode(request *restful.Request, response *restful.Response) {
 		err = response.WriteError(http.StatusBadRequest, err)
 		return
 	}
+
 	for _, applicant := range candidate {
 		if applicant.ProfileCode == code {
-			err := response.WriteEntity(applicant)
+			result := struct {
+				ProfileCode int `json:"profileCode"`
+				models.PersonalDetail
+			}{
+				ProfileCode:    applicant.ProfileCode,
+				PersonalDetail: applicant.PersonalDetail,
+			}
+			err := response.WriteEntity(result)
 			if err != nil {
 				return
 			}
@@ -70,39 +67,21 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 		return
 	}
 
-	// Create a new applicant with data from the request
-	applicant := models.Applicant{
-		WantedJobTitle: addRequest.WantedJobTitle,
-		FirstName:      addRequest.FirstName,
-		LastName:       addRequest.LastName,
-		Email:          addRequest.Email,
-		Phone:          addRequest.Phone,
-		Country:        addRequest.Country,
-		City:           addRequest.City,
-		Address:        addRequest.Address,
-		PostalCode:     addRequest.PostalCode,
-		DrivingLicense: addRequest.DrivingLicense,
-		Nationality:    addRequest.Nationality,
-		PlaceOfBirth:   addRequest.PlaceOfBirth,
-		DateOfBirth:    addRequest.DateOfBirth,
-		PhotoUrl:       addRequest.PhotoUrl,
-	}
-
 	// Generate a new profile code and assign it
 	newProfileCode := len(candidate) + 1
-	applicant.ProfileCode = newProfileCode
+	addRequest.ProfileCode = newProfileCode
 
 	// Append the new applicant to the candidate list
-	candidate = append(candidate, applicant)
+	candidate = append(candidate, *addRequest)
 
 	// Create a response JSON with the new profile code
-	response := struct {
+	result := struct {
 		ProfileCode int `json:"profileCode"`
 	}{
 		ProfileCode: newProfileCode,
 	}
 
-	err = res.WriteHeaderAndEntity(http.StatusCreated, response)
+	err = res.WriteHeaderAndEntity(http.StatusCreated, result)
 	if err != nil {
 		return
 	}
@@ -112,6 +91,14 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 func UpdateProfile(request *restful.Request, response *restful.Response) {
 	candidateCode := request.PathParameter("code")
 	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Read the updated data from the request
+	updateRequest := &models.Applicant{}
+	err = request.ReadEntity(updateRequest)
 	if err != nil {
 		err = response.WriteError(http.StatusBadRequest, err)
 		return
@@ -134,34 +121,12 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Read the updated data from the request
-	updateRequest := &models.Applicant{}
-	err = request.ReadEntity(updateRequest)
-	if err != nil {
-		err = response.WriteError(http.StatusBadRequest, err)
-		return
-	}
-
-	// Update the profile data
 	candidate[indexToUpdate] = models.Applicant{
 		ProfileCode:    code,
-		WantedJobTitle: updateRequest.WantedJobTitle,
-		FirstName:      updateRequest.FirstName,
-		LastName:       updateRequest.LastName,
-		Email:          updateRequest.Email,
-		Phone:          updateRequest.Phone,
-		Country:        updateRequest.Country,
-		City:           updateRequest.City,
-		Address:        updateRequest.Address,
-		PostalCode:     updateRequest.PostalCode,
-		DrivingLicense: updateRequest.DrivingLicense,
-		Nationality:    updateRequest.Nationality,
-		PlaceOfBirth:   updateRequest.PlaceOfBirth,
-		DateOfBirth:    updateRequest.DateOfBirth,
-		PhotoUrl:       updateRequest.PhotoUrl,
+		PersonalDetail: updateRequest.PersonalDetail,
 	}
 
-	err = response.WriteHeaderAndEntity(http.StatusOK, candidate)
+	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
 	if err != nil {
 		return
 	}
@@ -175,14 +140,13 @@ func GetExpByCode(request *restful.Request, response *restful.Response) {
 		err = response.WriteError(http.StatusBadRequest, err)
 		return
 	}
+
 	for _, applicant := range candidate {
 		if applicant.ProfileCode == code {
-			// Create a response JSON with the new workingExperience
-			workingExperience := "Software Engineer with bla bla bla experience."
 			resp := struct {
 				WorkingExperience string `json:"workingExperience"`
 			}{
-				WorkingExperience: workingExperience,
+				WorkingExperience: applicant.WorkExp.WorkingExperience,
 			}
 			err := response.WriteEntity(resp)
 			if err != nil {
@@ -234,9 +198,14 @@ func UpdateExperience(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	candidate[indexToUpdate].WorkingExperience = updateRequest.WorkingExperience
+	candidate[indexToUpdate].WorkExp.WorkingExperience = updateRequest.WorkingExperience
+	result := struct {
+		ProfileCode string `json:"profileCode"` // is it intended to show profileCode as the field name instead of workingExperience?
+	}{
+		ProfileCode: updateRequest.WorkingExperience,
+	}
 
-	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
+	err = response.WriteHeaderAndEntity(http.StatusOK, result)
 	if err != nil {
 		return
 	}

@@ -19,6 +19,10 @@ func main() {
 
 	// create a new route
 	webService.
+		Route(webService.GET("/profile").
+			To(restapi.GetAllData))
+
+	webService.
 		Route(webService.GET("/profile/{code}").
 			To(restapi.GetByCode))
 
