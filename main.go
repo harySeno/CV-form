@@ -50,6 +50,10 @@ func main() {
 		Route(webService.POST("/employment/{code}").
 			To(restapi.AddEmployment))
 
+	webService.
+		Route(webService.DELETE("/employment/{code}").
+			To(restapi.DeleteEmployment))
+
 	// create a new container
 	container := restful.NewContainer()
 	container.Add(webService)

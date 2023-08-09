@@ -281,8 +281,80 @@ func AddEmployment(request *restful.Request, response *restful.Response) {
 	// Append the new employment to the applicant's employment list
 	targetApplicant.Employment = append(targetApplicant.Employment, employment)
 
-	// Return the added employment data
-	err = response.WriteHeaderAndEntity(http.StatusCreated, employment)
+	result := struct {
+		ProfileCode int `json:"profileCode"`
+		ID          int `json:"id"`
+	}{
+		ProfileCode: code,
+		ID:          newID,
+	}
+
+	err = response.WriteHeaderAndEntity(http.StatusCreated, result)
+	if err != nil {
+		return
+	}
+}
+
+func DeleteEmployment(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Parse the 'id' query parameter
+	employmentID := request.QueryParameter("id")
+	id, err := strconv.Atoi(employmentID)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the applicant with the given code
+	var targetApplicant *models.Applicant
+	for i := range candidate {
+		if candidate[i].ProfileCode == code {
+			targetApplicant = &candidate[i]
+			break
+		}
+	}
+
+	if targetApplicant == nil {
+		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Find the index of the employment with the specified 'id'
+	indexToRemove := -1
+	for i := range targetApplicant.Employment {
+		if targetApplicant.Employment[i].ID == id {
+			indexToRemove = i
+			break
+		}
+	}
+
+	if indexToRemove == -1 {
+		err = response.WriteError(http.StatusNotFound, errors.New("employment not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Remove the employment from the applicant's Employment slice
+	targetApplicant.Employment = append(targetApplicant.Employment[:indexToRemove], targetApplicant.Employment[indexToRemove+1:]...)
+
+	result := struct {
+		ProfileCode int `json:"profileCode"`
+	}{
+		ProfileCode: code,
+	}
+
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}
