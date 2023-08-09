@@ -46,6 +46,10 @@ func main() {
 		Route(webService.GET("/employment/{code}").
 			To(restapi.GetEmploymentByCode))
 
+	webService.
+		Route(webService.POST("/employment/{code}").
+			To(restapi.AddEmployment))
+
 	// create a new container
 	container := restful.NewContainer()
 	container.Add(webService)

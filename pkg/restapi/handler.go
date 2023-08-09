@@ -240,3 +240,50 @@ func GetEmploymentByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 }
+
+// AddEmployment handles POST requests to add an applicant employment by profile code
+func AddEmployment(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	employment := models.Employment{}
+	err = request.ReadEntity(&employment)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the applicant with the given code
+	var targetApplicant *models.Applicant
+	for i := range candidate {
+		if candidate[i].ProfileCode == code {
+			targetApplicant = &candidate[i]
+			break
+		}
+	}
+
+	if targetApplicant == nil {
+		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Generate a new ID for the new employment
+	newID := len(targetApplicant.Employment) + 1
+	employment.ID = newID
+
+	// Append the new employment to the applicant's employment list
+	targetApplicant.Employment = append(targetApplicant.Employment, employment)
+
+	// Return the added employment data
+	err = response.WriteHeaderAndEntity(http.StatusCreated, employment)
+	if err != nil {
+		return
+	}
+}
