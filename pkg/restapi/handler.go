@@ -8,6 +8,7 @@ import (
 	"github.com/emicklei/go-restful/v3"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -193,7 +194,107 @@ func UploadPhoto(request *restful.Request, response *restful.Response) {
 
 	// Update the PhotoUrl field with the new path
 	candidate[indexToUpdate].PhotoUrl = imagePath + filename
-	err = response.WriteHeaderAndEntity(http.StatusOK, candidate[indexToUpdate])
+	result := struct {
+		ProfileCode int    `json:"profileCode"`
+		PhotoUrl    string `json:"photoUrl"`
+	}{
+		ProfileCode: code,
+		PhotoUrl:    candidate[indexToUpdate].PhotoUrl,
+	}
+	err = response.WriteHeaderAndEntity(http.StatusOK, result)
+	if err != nil {
+		return
+	}
+}
+
+// DownloadPhoto handles GET requests to download an applicant's photo by profile code
+func DownloadPhoto(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the applicant with the given code
+	var targetApplicant *models.Applicant
+	for _, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			targetApplicant = &applicant
+			break
+		}
+	}
+
+	if targetApplicant == nil {
+		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Read the image file
+	imagePath := targetApplicant.PhotoUrl
+	imageFile, err := ioutil.ReadFile(imagePath)
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	response.Header().Set("Content-Type", "image/png")
+	_, err = response.Write(imageFile)
+	if err != nil {
+		_ = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+}
+
+// DeletePhoto handles DELETE requests to delete an applicant's photo by profile code
+func DeletePhoto(request *restful.Request, response *restful.Response) {
+	candidateCode := request.PathParameter("code")
+	code, err := strconv.Atoi(candidateCode)
+	if err != nil {
+		err = response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	// Find the applicant with the given code
+	var targetApplicant *models.Applicant
+	for i, applicant := range candidate {
+		if applicant.ProfileCode == code {
+			targetApplicant = &candidate[i]
+			break
+		}
+	}
+
+	if targetApplicant == nil {
+		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// Delete the image file
+	imagePath := targetApplicant.PhotoUrl
+	err = os.Remove(imagePath)
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// Clear the PhotoUrl field
+	targetApplicant.PhotoUrl = ""
+
+	result := struct {
+		ProfileCode int    `json:"profileCode"`
+		Message     string `json:"message"`
+	}{
+		ProfileCode: code,
+		Message:     "Photo deleted successfully",
+	}
+
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}

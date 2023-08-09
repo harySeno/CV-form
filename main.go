@@ -39,6 +39,14 @@ func main() {
 			To(restapi.UploadPhoto))
 
 	webService.
+		Route(webService.GET("/photo/{code}").
+			To(restapi.DownloadPhoto))
+
+	webService.
+		Route(webService.DELETE("/photo/{code}").
+			To(restapi.DeletePhoto))
+
+	webService.
 		Route(webService.GET("/working-experience/{code}").
 			To(restapi.GetExpByCode))
 
