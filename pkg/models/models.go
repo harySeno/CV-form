@@ -1,6 +1,9 @@
 package models
 
+import "github.com/jinzhu/gorm"
+
 type Applicant struct {
+	gorm.Model
 	ProfileCode int `json:"profileCode"`
 	PersonalDetail
 	WorkExp
@@ -10,6 +13,7 @@ type Applicant struct {
 }
 
 type PersonalDetail struct {
+	gorm.Model
 	WantedJobTitle string `json:"wantedJobTitle"`
 	FirstName      string `json:"firstName"`
 	LastName       string `json:"lastName"`
@@ -27,10 +31,12 @@ type PersonalDetail struct {
 }
 
 type WorkExp struct {
+	gorm.Model
 	WorkingExperience string `json:"workingExperience"`
 }
 
 type Employment struct {
+	gorm.Model
 	ID          int    `json:"id"`
 	JobTitle    string `json:"jobTitle"`
 	Employer    string `json:"employer"`
@@ -41,6 +47,7 @@ type Employment struct {
 }
 
 type Education struct {
+	gorm.Model
 	ID          int    `json:"id"`
 	School      string `json:"school"`
 	Degree      string `json:"degree"`
@@ -51,78 +58,8 @@ type Education struct {
 }
 
 type Skill struct {
+	gorm.Model
 	ID    int    `json:"id"`
 	Skill string `json:"skill"`
 	Level string `json:"level"`
-}
-
-var MockApplicantData = []Applicant{{
-	ProfileCode: 12345678,
-	PersonalDetail: PersonalDetail{
-		WantedJobTitle: "Software Engineer",
-		FirstName:      "Namaku",
-		LastName:       "Ukaman",
-		Email:          "ukaman.namaku@gmail.com",
-		Phone:          "08008880000",
-		Country:        "Indonesia",
-		City:           "Jakarta",
-		Address:        "Jl. Gatot Subroto",
-		PostalCode:     200001,
-		DrivingLicense: "1234567890123456",
-		Nationality:    "Indonesia",
-		PlaceOfBirth:   "Maluku",
-		DateOfBirth:    "07-12-1988",
-		PhotoUrl:       "/app/upload/photo/12345678.png",
-	},
-	WorkExp: WorkExp{
-		WorkingExperience: "software engineer bla bla bla",
-	},
-	Employment: []Employment{{
-		ID:          1,
-		JobTitle:    "CEO",
-		Employer:    "Toko Lapak",
-		StartDate:   "01-01-2020",
-		EndDate:     "01-01-2021",
-		City:        "Jakarta",
-		Description: "CEO",
-	}, {
-		ID:          2,
-		JobTitle:    "UI/UX Designer",
-		Employer:    "Pemprov DKI",
-		StartDate:   "01-01-2021",
-		EndDate:     "01-01-2022",
-		City:        "Jakarta",
-		Description: "Designer",
-	}},
-	Education: []Education{{
-		ID:          1,
-		School:      "ITB",
-		Degree:      "S1",
-		StartDate:   "01-06-2000",
-		EndDate:     "01-06-2004",
-		City:        "Bandung",
-		Description: "ITB",
-	}, {
-		ID:          2,
-		School:      "UI",
-		Degree:      "S2",
-		StartDate:   "01-07-2005",
-		EndDate:     "01-08-2008",
-		City:        "Jakarta",
-		Description: "UI",
-	}},
-	Skill: []Skill{{
-		ID:    1,
-		Skill: "Docker",
-		Level: "Expert",
-	}, {
-		ID:    2,
-		Skill: "React JS",
-		Level: "Expert",
-	}, {
-		ID:    3,
-		Skill: "Golang",
-		Level: "Expert",
-	}},
-},
 }

@@ -15,11 +15,6 @@ import (
 
 var candidate []models.Applicant
 
-// InitializeMockData initializes the mock data for testing
-func InitializeMockData() {
-	candidate = models.MockApplicantData
-}
-
 func GetAllData(_ *restful.Request, res *restful.Response) {
 	err := res.WriteEntity(candidate)
 	if err != nil {

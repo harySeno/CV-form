@@ -1,8 +1,11 @@
 package main
 
 import (
+	"CV-form/pkg/database"
+	"CV-form/pkg/models"
 	"CV-form/pkg/restapi"
 	"github.com/emicklei/go-restful/v3"
+	"github.com/jinzhu/gorm"
 	"log"
 	"net/http"
 )
@@ -14,8 +17,23 @@ func main() {
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	// initiate mock data
-	restapi.InitializeMockData()
+	db, err := database.InitDB()
+	if err != nil {
+		panic("Failed to connect to the database")
+	}
+	defer func(db *gorm.DB) {
+		err := db.Close()
+		if err != nil {
+
+		}
+	}(db)
+
+	db.AutoMigrate(
+		&models.Applicant{},
+		&models.Employment{},
+		&models.Education{},
+		&models.Skill{},
+	)
 
 	// create a new route
 	webService.
