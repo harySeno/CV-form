@@ -17,6 +17,7 @@ func main() {
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
+	// initiate database connection
 	db, err := database.InitDB()
 	if err != nil {
 		panic("Failed to connect to the database")
@@ -28,12 +29,14 @@ func main() {
 		}
 	}(db)
 
+	// create database tables
 	db.AutoMigrate(
 		&models.Applicant{},
+		&models.PersonalDetail{},
+		&models.WorkExp{},
 		&models.Employment{},
 		&models.Education{},
-		&models.Skill{},
-	)
+		&models.Skill{})
 
 	// create a new route
 	webService.
