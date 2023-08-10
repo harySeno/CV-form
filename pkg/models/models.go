@@ -13,7 +13,6 @@ type Applicant struct {
 }
 
 type PersonalDetail struct {
-	gorm.Model
 	WantedJobTitle string `json:"wantedJobTitle"`
 	FirstName      string `json:"firstName"`
 	LastName       string `json:"lastName"`
@@ -31,12 +30,10 @@ type PersonalDetail struct {
 }
 
 type WorkExp struct {
-	gorm.Model
 	WorkingExperience string `json:"workingExperience"`
 }
 
 type Employment struct {
-	gorm.Model
 	ID          int    `json:"id"`
 	JobTitle    string `json:"jobTitle"`
 	Employer    string `json:"employer"`
@@ -47,7 +44,6 @@ type Employment struct {
 }
 
 type Education struct {
-	gorm.Model
 	ID          int    `json:"id"`
 	School      string `json:"school"`
 	Degree      string `json:"degree"`
@@ -58,8 +54,31 @@ type Education struct {
 }
 
 type Skill struct {
-	gorm.Model
 	ID    int    `json:"id"`
 	Skill string `json:"skill"`
 	Level string `json:"level"`
+}
+
+func (Applicant) TableName() string {
+	return "applicants"
+}
+
+func (PersonalDetail) TableName() string {
+	return "personaldetails"
+}
+
+func (WorkExp) TableName() string {
+	return "workexps"
+}
+
+func (Employment) TableName() string {
+	return "employments"
+}
+
+func (Education) TableName() string {
+	return "educations"
+}
+
+func (Skill) TableName() string {
+	return "skills"
 }
