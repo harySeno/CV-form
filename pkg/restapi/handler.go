@@ -1,11 +1,13 @@
 package restapi
 
 import (
+	"CV-form/pkg/database"
 	"CV-form/pkg/models"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/emicklei/go-restful/v3"
+	"github.com/jinzhu/gorm"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -15,8 +17,16 @@ import (
 
 var candidate []models.Applicant
 
-func GetAllData(_ *restful.Request, res *restful.Response) {
-	err := res.WriteEntity(candidate)
+func GetAllData(_ *restful.Request, response *restful.Response) {
+	// Use the DB instance from database package to retrieve data
+	var candidates []models.Applicant
+	err := database.DB.Find(&candidates).Error
+	if err != nil {
+		err = response.WriteError(http.StatusNotFound, err)
+		return
+	}
+
+	err = response.WriteEntity(candidate)
 	if err != nil {
 		return
 	}
@@ -31,36 +41,34 @@ func GetByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	for _, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			result := struct {
-				ProfileCode int `json:"profileCode"`
-				models.PersonalDetail
-			}{
-				ProfileCode:    applicant.ProfileCode,
-				PersonalDetail: applicant.PersonalDetail,
-			}
-			err := response.WriteEntity(result)
-			if err != nil {
-				return
-			}
-			return
-		}
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusNotFound, err)
+		return
 	}
 
-	err = response.WriteError(http.StatusNotFound, err)
+	result := struct {
+		ProfileCode int `json:"profileCode"`
+		models.PersonalDetail
+	}{
+		ProfileCode:    applicant.ProfileCode,
+		PersonalDetail: applicant.PersonalDetail,
+	}
+
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}
 }
 
 // AddProfile handles POST requests to add a new applicant profile
-func AddProfile(req *restful.Request, res *restful.Response) {
+func AddProfile(request *restful.Request, response *restful.Response) {
 	addRequest := &models.Applicant{}
 
-	err := req.ReadEntity(addRequest)
+	err := request.ReadEntity(addRequest)
 	if err != nil {
-		err := res.WriteErrorString(http.StatusBadRequest, "Invalid payload format")
+		err := response.WriteErrorString(http.StatusBadRequest, "Invalid payload format")
 		if err != nil {
 			return
 		}
@@ -71,17 +79,20 @@ func AddProfile(req *restful.Request, res *restful.Response) {
 	newProfileCode := len(candidate) + 1
 	addRequest.ProfileCode = newProfileCode
 
-	// Append the new applicant to the candidate list
-	candidate = append(candidate, *addRequest)
+	// Create a new applicant in the database
+	err = database.DB.Create(addRequest).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
-	// Create a response JSON with the new profile code
 	result := struct {
 		ProfileCode int `json:"profileCode"`
 	}{
-		ProfileCode: newProfileCode,
+		ProfileCode: addRequest.ProfileCode,
 	}
 
-	err = res.WriteHeaderAndEntity(http.StatusCreated, result)
+	err = response.WriteHeaderAndEntity(http.StatusCreated, result)
 	if err != nil {
 		return
 	}
@@ -104,27 +115,31 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the index of the profile with the given code
-	indexToUpdate := -1
-	for i, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			indexToUpdate = i
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if indexToUpdate == -1 {
-		err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
 		if err != nil {
 			return
 		}
 		return
 	}
 
-	candidate[indexToUpdate] = models.Applicant{
-		ProfileCode:    code,
-		PersonalDetail: updateRequest.PersonalDetail,
+	// Update the applicant's personal detail
+	applicant.PersonalDetail = updateRequest.PersonalDetail
+
+	// Save the updated applicant to the database
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
 	}
+
 	result := struct {
 		ProfileCode int `json:"profileCode"`
 	}{
@@ -132,6 +147,7 @@ func UpdateProfile(request *restful.Request, response *restful.Response) {
 	}
 	err = response.WriteHeaderAndEntity(http.StatusOK, result)
 	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 }
@@ -145,17 +161,15 @@ func UploadPhoto(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the index of the profile with the given code
-	indexToUpdate := -1
-	for i, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			indexToUpdate = i
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if indexToUpdate == -1 {
-		err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
 		if err != nil {
 			return
 		}
@@ -166,7 +180,6 @@ func UploadPhoto(request *restful.Request, response *restful.Response) {
 	updateRequest := struct {
 		Image string `json:"base64img"`
 	}{}
-
 	err = request.ReadEntity(&updateRequest)
 	if err != nil {
 		err = response.WriteError(http.StatusBadRequest, err)
@@ -181,7 +194,7 @@ func UploadPhoto(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	filename := fmt.Sprintf("%d.png", candidate[indexToUpdate].ProfileCode)
+	filename := fmt.Sprintf("%d.png", applicant.ProfileCode)
 	imagePath := "/home/seno/Desktop"
 
 	// Write the image data to the file
@@ -192,16 +205,25 @@ func UploadPhoto(request *restful.Request, response *restful.Response) {
 	}
 
 	// Update the PhotoUrl field with the new path
-	candidate[indexToUpdate].PhotoUrl = imagePath + filename
+	applicant.PhotoUrl = imagePath + filename
+
+	// Save the updated applicant to the database
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
 	result := struct {
 		ProfileCode int    `json:"profileCode"`
 		PhotoUrl    string `json:"photoUrl"`
 	}{
 		ProfileCode: code,
-		PhotoUrl:    candidate[indexToUpdate].PhotoUrl,
+		PhotoUrl:    applicant.PhotoUrl,
 	}
 	err = response.WriteHeaderAndEntity(http.StatusOK, result)
 	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 }
@@ -215,17 +237,15 @@ func DownloadPhoto(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for _, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			targetApplicant = &applicant
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -233,7 +253,7 @@ func DownloadPhoto(request *restful.Request, response *restful.Response) {
 	}
 
 	// Read the image file
-	imagePath := targetApplicant.PhotoUrl
+	imagePath := applicant.PhotoUrl
 	imageFile, err := ioutil.ReadFile(imagePath)
 	if err != nil {
 		err = response.WriteError(http.StatusInternalServerError, err)
@@ -257,17 +277,15 @@ func DeletePhoto(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -275,15 +293,20 @@ func DeletePhoto(request *restful.Request, response *restful.Response) {
 	}
 
 	// Delete the image file
-	imagePath := targetApplicant.PhotoUrl
+	imagePath := applicant.PhotoUrl
 	err = os.Remove(imagePath)
 	if err != nil {
 		err = response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 
-	// Clear the PhotoUrl field
-	targetApplicant.PhotoUrl = ""
+	// Clear the PhotoUrl field in the database
+	applicant.PhotoUrl = ""
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
 	result := struct {
 		ProfileCode int    `json:"profileCode"`
@@ -308,22 +331,28 @@ func GetExpByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	for _, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			result := struct {
-				WorkingExperience string `json:"workingExperience"`
-			}{
-				WorkingExperience: applicant.WorkExp.WorkingExperience,
-			}
-			err := response.WriteEntity(result)
-			if err != nil {
-				return
-			}
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
+		}
+		if err != nil {
 			return
 		}
+		return
 	}
 
-	err = response.WriteError(http.StatusNotFound, err)
+	result := struct {
+		WorkingExperience string `json:"workingExperience"`
+	}{
+		WorkingExperience: applicant.WorkExp.WorkingExperience,
+	}
+
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}
@@ -348,24 +377,29 @@ func UpdateExperience(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the index of the profile with the given code
-	indexToUpdate := -1
-	for i, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			indexToUpdate = i
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if indexToUpdate == -1 {
-		err = response.WriteError(http.StatusNotFound, errors.New("profile not found"))
 		if err != nil {
 			return
 		}
 		return
 	}
 
-	candidate[indexToUpdate].WorkExp.WorkingExperience = updateRequest.WorkingExperience
+	// Update the working experience
+	applicant.WorkExp.WorkingExperience = updateRequest.WorkingExperience
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
 	result := struct {
 		ProfileCode string `json:"profileCode"` // is it intended to show profileCode as the field name instead of workingExperience?
 	}{
@@ -387,22 +421,27 @@ func GetEmploymentByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	for _, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			result := struct {
-				Employment []models.Employment `json:"employment"`
-			}{
-				Employment: applicant.Employment,
-			}
-			err := response.WriteEntity(result)
-			if err != nil {
-				return
-			}
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Preload("Employment").Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
+		}
+		if err != nil {
 			return
 		}
+		return
 	}
 
-	err = response.WriteError(http.StatusNotFound, err)
+	result := struct {
+		Employment []models.Employment `json:"employment"`
+	}{
+		Employment: applicant.Employment,
+	}
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}
@@ -424,17 +463,15 @@ func AddEmployment(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i := range candidate {
-		if candidate[i].ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -442,11 +479,17 @@ func AddEmployment(request *restful.Request, response *restful.Response) {
 	}
 
 	// Generate a new ID for the new employment
-	newID := len(targetApplicant.Employment) + 1
+	newID := len(applicant.Employment) + 1
 	employment.ID = newID
 
 	// Append the new employment to the applicant's employment list
-	targetApplicant.Employment = append(targetApplicant.Employment, employment)
+	applicant.Employment = append(applicant.Employment, employment)
+
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
 	result := struct {
 		ProfileCode int `json:"profileCode"`
@@ -479,17 +522,15 @@ func DeleteEmployment(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i := range candidate {
-		if candidate[i].ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -498,8 +539,8 @@ func DeleteEmployment(request *restful.Request, response *restful.Response) {
 
 	// Find the index of the employment with the specified 'id'
 	indexToRemove := -1
-	for i := range targetApplicant.Employment {
-		if targetApplicant.Employment[i].ID == id {
+	for i := range applicant.Employment {
+		if applicant.Employment[i].ID == id {
 			indexToRemove = i
 			break
 		}
@@ -514,7 +555,13 @@ func DeleteEmployment(request *restful.Request, response *restful.Response) {
 	}
 
 	// Remove the employment from the applicant's Employment slice
-	targetApplicant.Employment = append(targetApplicant.Employment[:indexToRemove], targetApplicant.Employment[indexToRemove+1:]...)
+	applicant.Employment = append(applicant.Employment[:indexToRemove], applicant.Employment[indexToRemove+1:]...)
+
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
 	result := struct {
 		ProfileCode int `json:"profileCode"`
@@ -537,22 +584,28 @@ func GetEducationByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	for _, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			result := struct {
-				Education []models.Education `json:"education"`
-			}{
-				Education: applicant.Education,
-			}
-			err := response.WriteEntity(result)
-			if err != nil {
-				return
-			}
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).Preload("Education").First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
+		}
+		if err != nil {
 			return
 		}
+		return
 	}
 
-	err = response.WriteError(http.StatusNotFound, err)
+	result := struct {
+		Education []models.Education `json:"education"`
+	}{
+		Education: applicant.Education,
+	}
+
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}
@@ -574,17 +627,15 @@ func AddEducation(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i := range candidate {
-		if candidate[i].ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -592,11 +643,16 @@ func AddEducation(request *restful.Request, response *restful.Response) {
 	}
 
 	// Generate a new ID for the new education
-	newID := len(targetApplicant.Education) + 1
+	newID := len(applicant.Education) + 1
 	education.ID = newID
 
-	// Append the new education to the applicant's education list
-	targetApplicant.Education = append(targetApplicant.Education, education)
+	applicant.Education = append(applicant.Education, education)
+
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
 	result := struct {
 		ProfileCode int `json:"profileCode"`
@@ -629,17 +685,15 @@ func DeleteEducation(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i := range candidate {
-		if candidate[i].ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).Preload("Education").First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -648,8 +702,8 @@ func DeleteEducation(request *restful.Request, response *restful.Response) {
 
 	// Find the index of the education with the specified 'id'
 	indexToRemove := -1
-	for i := range targetApplicant.Education {
-		if targetApplicant.Education[i].ID == id {
+	for i := range applicant.Education {
+		if applicant.Education[i].ID == id {
 			indexToRemove = i
 			break
 		}
@@ -664,7 +718,16 @@ func DeleteEducation(request *restful.Request, response *restful.Response) {
 	}
 
 	// Remove the education from the applicant's Education slice
-	targetApplicant.Education = append(targetApplicant.Education[:indexToRemove], targetApplicant.Education[indexToRemove+1:]...)
+	applicant.Education = append(applicant.Education[:indexToRemove], applicant.Education[indexToRemove+1:]...)
+
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		if err != nil {
+			return
+		}
+		return
+	}
 
 	result := struct {
 		ProfileCode int `json:"profileCode"`
@@ -687,22 +750,28 @@ func GetSkillByCode(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	for _, applicant := range candidate {
-		if applicant.ProfileCode == code {
-			result := struct {
-				Skill []models.Skill `json:"skill"`
-			}{
-				Skill: applicant.Skill,
-			}
-			err := response.WriteEntity(result)
-			if err != nil {
-				return
-			}
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).Preload("Skill").First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
+		}
+		if err != nil {
 			return
 		}
+		return
 	}
 
-	err = response.WriteError(http.StatusNotFound, err)
+	result := struct {
+		Skill []models.Skill `json:"skill"`
+	}{
+		Skill: applicant.Skill,
+	}
+
+	err = response.WriteEntity(result)
 	if err != nil {
 		return
 	}
@@ -724,29 +793,33 @@ func AddSkill(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i := range candidate {
-		if candidate[i].ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).Preload("Skill").First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
 		return
 	}
 
-	// Generate a new ID for the new education
-	newID := len(targetApplicant.Skill) + 1
+	// Generate a new ID for the new skill
+	newID := len(applicant.Skill) + 1
 	skill.ID = newID
 
-	// Append the new education to the applicant's education list
-	targetApplicant.Skill = append(targetApplicant.Skill, skill)
+	// Append the new skill to the applicant's skill list
+	applicant.Skill = append(applicant.Skill, skill)
+
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
 	result := struct {
 		ProfileCode int `json:"profileCode"`
@@ -779,17 +852,15 @@ func DeleteSkill(request *restful.Request, response *restful.Response) {
 		return
 	}
 
-	// Find the applicant with the given code
-	var targetApplicant *models.Applicant
-	for i := range candidate {
-		if candidate[i].ProfileCode == code {
-			targetApplicant = &candidate[i]
-			break
+	// Find the applicant in the database
+	var applicant models.Applicant
+	err = database.DB.Where("profile_code = ?", code).Preload("Skill").First(&applicant).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
+		} else {
+			err = response.WriteError(http.StatusInternalServerError, err)
 		}
-	}
-
-	if targetApplicant == nil {
-		err = response.WriteError(http.StatusNotFound, errors.New("applicant not found"))
 		if err != nil {
 			return
 		}
@@ -798,8 +869,8 @@ func DeleteSkill(request *restful.Request, response *restful.Response) {
 
 	// Find the index of the skill with the specified 'id'
 	indexToRemove := -1
-	for i := range targetApplicant.Skill {
-		if targetApplicant.Skill[i].ID == id {
+	for i := range applicant.Skill {
+		if applicant.Skill[i].ID == id {
 			indexToRemove = i
 			break
 		}
@@ -814,7 +885,13 @@ func DeleteSkill(request *restful.Request, response *restful.Response) {
 	}
 
 	// Remove the skill from the applicant's skill slice
-	targetApplicant.Skill = append(targetApplicant.Skill[:indexToRemove], targetApplicant.Skill[indexToRemove+1:]...)
+	applicant.Skill = append(applicant.Skill[:indexToRemove], applicant.Skill[indexToRemove+1:]...)
+
+	err = database.DB.Save(&applicant).Error
+	if err != nil {
+		err = response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
 
 	result := struct {
 		ProfileCode int `json:"profileCode"`
